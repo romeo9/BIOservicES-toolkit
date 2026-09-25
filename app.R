@@ -458,7 +458,18 @@ if (!file.exists(bundle_file)) {
   )
 }
 
-loaded_bundle <- readRDS(bundle_file)
+#loaded_bundle <- readRDS(bundle_file)
+
+selected_fits <- eventReactive(input$main_tab, {
+    req(input$main_tab == "analysis_tab") # Adjust tab value
+    
+    showNotification("Loading models, please wait...", type = "message", id = "model_load_notif")
+    
+    loaded_bundle <- readRDS(bundle_file)
+    
+    removeNotification(id = "model_load_notif")
+    return(loaded_bundle)
+  })
 
 missing_model_names <- setdiff(
   selected_model_names,
