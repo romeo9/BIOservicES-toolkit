@@ -276,7 +276,14 @@ if (nrow(duplicate_intercepts) > 0) {
   stop("The intercept workbook contains duplicate model_name / Region_LU rows.")
 }
 
-df_shiny <- readRDS(data_file)
+#df_shiny <- readRDS(data_file)
+
+eventReactive(input$main_tab, {
+    req(input$main_tab %in% c("explorer_tab", "analysis_tab")) # Adjust to your actual tab values
+    
+    # Reads df_shiny.rds only when user leaves "Read me"
+    readRDS(data_file)
+  }, ignoreNULL = FALSE)
 
 #### check iniziali sul file di caricamento 
 #(all(unique(indicator_results$biodiversity) %in% names(df_shiny)))
