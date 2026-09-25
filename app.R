@@ -178,21 +178,22 @@ build_indicator_results_from_pipeline <- function() {
 
 indicator_data_source <- "additive-aware workbook"
 
-indicator_results <- if (file.exists(indicator_file)) {
-  tryCatch(
-    readxl::read_excel(indicator_file),
-    error = function(e) NULL
-  )
-} else {
-  NULL
-}
+indicator_results <- eventReactive(input$main_tab, {
+    req(input$main_tab %in% c("explorer_tab", "analysis_tab"))
+    
+    if (file.exists(indicator_file)) {
+      readxl::read_excel(indicator_file)
+    } else {
+      build_indicator_results_from_pipeline()
+      indicator_data_source <- "pipeline CSV fallback (old interaction-only workbook detected)"
+    }
+  })
 
 if (
   is.null(indicator_results) ||
     !all(required_result_columns %in% names(indicator_results))
 ) {
   indicator_results <- build_indicator_results_from_pipeline()
-  indicator_data_source <- "pipeline CSV fallback (old interaction-only workbook detected)"
 }
 
 missing_result_columns <- setdiff(
