@@ -178,16 +178,6 @@ build_indicator_results_from_pipeline <- function() {
 
 indicator_data_source <- "additive-aware workbook"
 
-indicator_results <- eventReactive(input$main_tab, {
-    req(input$main_tab %in% c("explorer_tab", "analysis_tab"))
-    
-    if (file.exists(indicator_file)) {
-      readxl::read_excel(indicator_file)
-    } else {
-      build_indicator_results_from_pipeline()
-      indicator_data_source <- "pipeline CSV fallback (old interaction-only workbook detected)"
-    }
-  })
 
 if (
   is.null(indicator_results) ||
@@ -276,15 +266,6 @@ duplicate_intercepts <- intercept_results %>%
 if (nrow(duplicate_intercepts) > 0) {
   stop("The intercept workbook contains duplicate model_name / Region_LU rows.")
 }
-
-#df_shiny <- readRDS(data_file)
-
-eventReactive(input$main_tab, {
-    req(input$main_tab %in% c("explorer_tab", "analysis_tab")) # Adjust to your actual tab values
-    
-    # Reads df_shiny.rds only when user leaves "Read me"
-    readRDS(data_file)
-  }, ignoreNULL = FALSE)
 
 #### check iniziali sul file di caricamento 
 #(all(unique(indicator_results$biodiversity) %in% names(df_shiny)))
@@ -459,18 +440,6 @@ if (!file.exists(bundle_file)) {
   )
 }
 
-#loaded_bundle <- readRDS(bundle_file)
-
-selected_fits <- eventReactive(input$main_tab, {
-    req(input$main_tab == "analysis_tab") # Adjust tab value
-    
-    showNotification("Loading models, please wait...", type = "message", id = "model_load_notif")
-    
-    loaded_bundle <- readRDS(bundle_file)
-    
-    removeNotification(id = "model_load_notif")
-    return(loaded_bundle)
-  })
 
 missing_model_names <- setdiff(
   selected_model_names,
@@ -486,8 +455,6 @@ if (length(missing_model_names) > 0) {
     call. = FALSE
   )
 }
-
-selected_fits <- loaded_bundle[selected_model_names]
 
 model_loaded <- !vapply(
   selected_fits,
@@ -1221,6 +1188,58 @@ ui <- shiny::fluidPage(
 ## 5. Server logic
 ## =========================================================
 server <- function(input, output, session) {
+
+  # =========================================================
+  # LAZY LOADING: I file vengono letti solo quando l'utente
+  # passa a una scheda diversa da "Read me"
+  # =========================================================
+
+  # 1. Carica df_shiny.rds solo quando si esce dalla tab Read me
+  df_shiny <- eventReactive(input$main_tab, {
+    req(input$main_tab != "readme")
+    
+    if (!file.exists(data_file)) {
+      stop("Missing file: ", data_file)
+    }
+    readRDS(data_file)
+  })
+
+  # 2. Carica le tabelle degli indicatori e degli intercetti
+  indicator_results <- eventReactive(input$main_tab, {
+    req(input$main_tab != "readme")
+    
+    if (file.exists(indicator_file)) {
+      tryCatch(readxl::read_excel(indicator_file), error = function(e) NULL)
+    } else {
+      build_indicator_results_from_pipeline()
+    }
+  })
+
+  intercept_results <- eventReactive(input$main_tab, {
+    req(input$main_tab != "readme")
+    
+    if (file.exists(intercept_file)) {
+      readxl::read_excel(intercept_file)
+    } else {
+      stop("Missing file: ", intercept_file)
+    }
+  })
+
+  # 3. Carica il bundle pesante dei modelli (.rds) solo quando necessario
+  selected_fits <- eventReactive(input$main_tab, {
+    req(input$main_tab != "readme")
+    
+    showNotification("Caricamento modelli in corso...", type = "message", id = "load_models_notif")
+    
+    if (!file.exists(bundle_file)) {
+      stop("Missing required model bundle: ", bundle_file)
+    }
+    
+    bundle <- readRDS(bundle_file)
+    removeNotification(id = "load_models_notif")
+    
+    return(bundle)
+  })
 
   ## -------------------------------------------------------
   ## Read me: descriptive tables and downloads
